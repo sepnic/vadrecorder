@@ -42,9 +42,9 @@ VadRecorder::VadRecorder()
       mEncoderHandle(NULL),
       mEncoderListener(NULL),
       mVadHandle(NULL),
-      mVoiceMarginMsMax(0),
-      mVoiceMarginMsVal(0),
-      mVoiceDetected(false),
+      mSpeechDetected(false),
+      mSpeechMarginMsMax(0),
+      mSpeechMarginMsVal(0),
       mCacheBuffer(NULL),
       mCacheBufferLength(0)
 {}
@@ -101,8 +101,8 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
     mRecorderListener = listener;
     mEncoderType = encoderType;
-    mVoiceDetected = false;
-    mVoiceMarginMsVal = 0;
+    mSpeechDetected = false;
+    mSpeechMarginMsVal = 0;
     mSampleRate = sampleRate;
     mChannels = channels;
     mBitsPerSample = bitsPerSample;
@@ -126,11 +126,15 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
     litevad_result_t vadResult = litevad_process(mVadHandle, inBuffer, inLength);
     switch (vadResult) {
     case LITEVAD_RESULT_SPEECH_BEGIN:
-        mVoiceDetected = true;
+        mSpeechDetected = true;
+        mRecorderListener->onSpeechBegin();
         break;
     case LITEVAD_RESULT_SPEECH_END:
-        mVoiceDetected = false;
-        mVoiceMarginMsVal = 0;
+        mSpeechDetected = false;
+        mSpeechMarginMsVal = 0;
+        mRecorderListener->onSpeechEnd();
+        if (mSpeechMarginMsMax > 0)
+            mRecorderListener->onMarginBegin();
         break;
     case LITEVAD_RESULT_ERROR:
         pr_err("Invalid litevad result");
@@ -139,11 +143,13 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
         break;
     }
 
-    bool needEncode = mVoiceDetected;
-    if (!mVoiceDetected) {
-        if (mVoiceMarginMsMax > 0 && mVoiceMarginMsVal <= mVoiceMarginMsMax) {
+    bool needEncode = mSpeechDetected;
+    if (!mSpeechDetected) {
+        if (mSpeechMarginMsMax > 0 && mSpeechMarginMsVal <= mSpeechMarginMsMax) {
             needEncode = true;
-            mVoiceMarginMsVal += inLength*1000/(mSampleRate*mChannels*mBitsPerSample/8);
+            mSpeechMarginMsVal += inLength*1000/(mSampleRate*mChannels*mBitsPerSample/8);
+            if (mSpeechMarginMsVal > mSpeechMarginMsMax)
+                mRecorderListener->onMarginEnd();
         }
     }
 

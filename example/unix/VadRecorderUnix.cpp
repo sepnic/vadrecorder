@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <string.h>
+#include <time.h>
 #include "portaudio.h"
 #include "VadRecorder.hpp"
 #include "logger.h"
@@ -24,7 +26,56 @@
 #define SAMPLE_RATE      16000
 #define CHANNEL_COUNT    1
 #define SAMPLE_BITS      16
-#define VOICE_MARGIN     (3*1000) // in ms
+#define SPEECH_MARGIN    (3*1000) // in ms
+
+class VadRecorderListenerUnix : public VadRecorderListener
+{
+public:
+    VadRecorderListenerUnix(FILE *voiceFile, FILE *timestampFile)
+      : mVoiceFile(voiceFile), mTimestampFile(timestampFile) {}
+
+    ~VadRecorderListenerUnix() {}
+
+    void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) {
+        if (mVoiceFile) fwrite(outBuffer, outLength, 1, mVoiceFile);
+    }
+
+    void onSpeechBegin() {
+        updateTimestampFile("Speech Begin");
+    }
+
+    void onSpeechEnd() {
+        updateTimestampFile("Speech End");
+    }
+
+    void onMarginBegin() {
+        updateTimestampFile("Margin Begin");
+    }
+
+    void onMarginEnd() {
+        updateTimestampFile("Margin End");
+    }
+
+private:
+    FILE *mVoiceFile;
+    FILE *mTimestampFile;
+
+    void updateTimestampFile(const char *event) {
+        char buffer[128];
+        struct tm now;
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        localtime_r(&ts.tv_sec, &now);
+        memset(buffer, 0x0, sizeof(buffer));
+        int ret = snprintf(buffer, sizeof(buffer),
+                "%4d-%02d-%02d %02d:%02d:%02d:%03d [%s]\n",
+                now.tm_year+1900, now.tm_mon+1, now.tm_mday,
+                now.tm_hour, now.tm_min, now.tm_sec, (int)((ts.tv_nsec/1000000)%1000),
+                event);
+        if (mTimestampFile)
+            fwrite(buffer, ret, 1, mTimestampFile);
+    }
+};
 
 static int PortAudio_InStreamCallback(const void *input, void *output,
     unsigned long frame_count, const PaStreamCallbackTimeInfo *time_info,
@@ -39,22 +90,32 @@ static int PortAudio_InStreamCallback(const void *input, void *output,
 
 int main(int argc, char *argv[])
 {
-    const char *filename = "out.aac";
-    if (argc < 2)
-        pr_wrn("Usage: %s out.aac", argv[0]);
-    else
-        filename = argv[1];
+    const char *voiceFileName = "rec_voice.aac";
+    const char *timestampFileName = "rec_timestamp.txt";
+    if (argc < 3) {
+        pr_wrn("Usage: %s rec_voice.aac rec_timestamp.txt", argv[0]);
+    } else {
+        voiceFileName = argv[1];
+        timestampFileName = argv[2];
+    }
 
-    FILE *outFile = fopen(filename, "wb");
-    if (outFile == NULL) {
-        pr_err("Failed to open output file");
+    FILE *voiceFile = fopen(voiceFileName, "wb");
+    if (voiceFile == NULL) {
+        pr_err("Failed to open output aac file: %s", voiceFileName);
+        return -1;
+    }
+
+    FILE *timestampFile = fopen(timestampFileName, "w");
+    if (timestampFile == NULL) {
+        pr_err("Failed to open output timestamp file: %s", timestampFileName);
         return -1;
     }
 
     // VadRecorder init
     VadRecorder *vadRecorder = new VadRecorder();
-    VadRecorderListener *vadRecorderListener = new VadRecorderListener(outFile);
-    vadRecorder->setVoiceMarginMs(VOICE_MARGIN);
+    VadRecorderListener *vadRecorderListener =
+            new VadRecorderListenerUnix(voiceFile, timestampFile);
+    vadRecorder->setSpeechMarginMs(SPEECH_MARGIN);
     if (!vadRecorder->init(vadRecorderListener, SAMPLE_RATE, CHANNEL_COUNT, SAMPLE_BITS)) {
         pr_err("Failed to init VadRecorder");
         goto __out;
@@ -118,6 +179,7 @@ __out:
     Pa_Terminate();
     delete vadRecorder;
     delete vadRecorderListener;
-    fclose(outFile);
+    fclose(voiceFile);
+    fclose(timestampFile);
     return 0;
 }

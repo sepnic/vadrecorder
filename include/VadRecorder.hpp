@@ -23,17 +23,42 @@
 
 class VadRecorderListener {
 public:
+    VadRecorderListener() : mFile(NULL) {}
     VadRecorderListener(FILE *file) : mFile(file) {}
     virtual ~VadRecorderListener() {}
     /**
-     * Callback to save output data.
+     * Callback to output encoded data.
      * \param outBuffer [IN] output buffer pointer.
      * \param outLength [IN] output buffer length in byte. 
      * \retval N/A.
      */
     virtual void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) {
-        if (mFile) fwrite(outBuffer, 1, outLength, mFile);
+        if (mFile) fwrite(outBuffer, outLength, 1, mFile);
     }
+    /**
+     * Callback to notify begin of speech.
+     * \param N/A.
+     * \retval N/A.
+     */
+    virtual void onSpeechBegin() {}
+    /**
+     * Callback to notify end of speech.
+     * \param N/A.
+     * \retval N/A.
+     */
+    virtual void onSpeechEnd() {}
+    /**
+     * Callback to notify begin of margin.
+     * \param N/A.
+     * \retval N/A.
+     */
+    virtual void onMarginBegin() {}
+    /**
+     * Callback to notify end of margin.
+     * \param N/A.
+     * \retval N/A.
+     */
+    virtual void onMarginEnd() {}
 private:
     FILE *mFile;
 };
@@ -50,8 +75,8 @@ public:
 
     ~VadRecorder();
 
-    void setVoiceMarginMs(unsigned int marginMs) {
-        mVoiceMarginMsMax = marginMs > 1000 ? marginMs : 1000;
+    void setSpeechMarginMs(unsigned int marginMs) {
+        mSpeechMarginMsMax = marginMs > 1000 ? marginMs : 1000;
     }
 
     static int getPerferredInputBufferSize(int sampleRate, int channels, int bitsPerSample) {
@@ -80,9 +105,9 @@ private:
     IAudioEncoder *mEncoderHandle;
     IAudioEncoderListener *mEncoderListener;
     void *mVadHandle;
-    unsigned int mVoiceMarginMsMax;
-    unsigned int mVoiceMarginMsVal;
-    bool mVoiceDetected;
+    bool mSpeechDetected;
+    unsigned int mSpeechMarginMsMax;
+    unsigned int mSpeechMarginMsVal;
     unsigned char *mCacheBuffer;
     int mCacheBufferLength;
 };
