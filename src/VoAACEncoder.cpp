@@ -17,22 +17,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "logger.h"
 #include "voAAC.h"
 #include "cmnMemory.h"
 #include "VoAACEncoder.hpp"
 
 #define TAG "VoAACEncoder"
-
-#if defined(ANDROID)
-#include <android/log.h>
-#define TAG "litevad"
-#define pr_dbg(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, TAG, fmt, ##__VA_ARGS__)
-#define pr_err(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, ##__VA_ARGS__)
-
-#else
-#define pr_dbg(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define pr_err(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
-#endif
 
 VoAACEncoder::VoAACEncoder()
     : mListener(NULL)

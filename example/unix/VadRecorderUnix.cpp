@@ -17,19 +17,9 @@
 #include <unistd.h>
 #include "portaudio.h"
 #include "VadRecorder.hpp"
+#include "logger.h"
 
-#if defined(ANDROID)
-#include <android/log.h>
 #define TAG "VadRecorderUnix"
-#define pr_dbg(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, TAG, fmt, ##__VA_ARGS__)
-#define pr_wrn(fmt, ...) __android_log_print(ANDROID_LOG_WARN,  TAG, fmt, ##__VA_ARGS__)
-#define pr_err(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, ##__VA_ARGS__)
-
-#else
-#define pr_dbg(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define pr_wrn(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define pr_err(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
-#endif
 
 #define SAMPLE_RATE      16000
 #define CHANNEL_COUNT    1
@@ -49,12 +39,13 @@ static int PortAudio_InStreamCallback(const void *input, void *output,
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
+    const char *filename = "out.aac";
+    if (argc < 2)
         pr_wrn("Usage: %s out.aac", argv[0]);
-        return -1;
-    }
+    else
+        filename = argv[1];
 
-    FILE *outFile = fopen(argv[1], "wb");
+    FILE *outFile = fopen(filename, "wb");
     if (outFile == NULL) {
         pr_err("Failed to open output file");
         return -1;

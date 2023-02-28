@@ -26,7 +26,7 @@ public:
     VadRecorderListener(FILE *file) : mFile(file) {}
     virtual ~VadRecorderListener() {}
     /**
-     * Listener to save output data.
+     * Callback to save output data.
      * \param outBuffer [IN] output buffer pointer.
      * \param outLength [IN] output buffer length in byte. 
      * \retval N/A.
@@ -46,12 +46,12 @@ public:
         ENCODER_CNT,
     };
 
-    VadRecorder() : mInited(false), mVoiceMarginMsMax(0) {}
+    VadRecorder();
 
     ~VadRecorder();
 
     void setVoiceMarginMs(unsigned int marginMs) {
-        mVoiceMarginMsMax = marginMs;
+        mVoiceMarginMsMax = marginMs > 1000 ? marginMs : 1000;
     }
 
     static int getPerferredInputBufferSize(int sampleRate, int channels, int bitsPerSample) {
@@ -81,8 +81,10 @@ private:
     IAudioEncoderListener *mEncoderListener;
     void *mVadHandle;
     unsigned int mVoiceMarginMsMax;
-    unsigned int mVoiceMarginMs;
+    unsigned int mVoiceMarginMsVal;
     bool mVoiceDetected;
+    unsigned char *mCacheBuffer;
+    int mCacheBufferLength;
 };
 
 #endif // __VADRECORDER_H

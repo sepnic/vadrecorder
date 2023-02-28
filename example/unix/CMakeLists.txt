@@ -76,7 +76,6 @@ set(VADREC_SRC
 add_library(vadrecorder STATIC ${VADREC_SRC} ${VOAAC_SRC} ${WEBRTC_SRC})
 
 ###############################################################################
-
 ## portaudio
 set(PORTAUDIO_DIR   "${TOP_DIR}/thirdparty/portaudio")
 include_directories(${PORTAUDIO_DIR}/include)
@@ -123,3 +122,4 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations")
 ## example
 add_executable(VadRecorderUnix ${CMAKE_SOURCE_DIR}/VadRecorderUnix.cpp ${PORTAUDIO_SRC})
 target_link_libraries(VadRecorderUnix vadrecorder pthread ${PLATFORM_LIB})
+###############################################################################

@@ -14,23 +14,14 @@
  ** limitations under the License.
  */
 
+#include <string.h>
+#include "logger.h"
 #include "litevad.h"
 #include "IAudioEncoder.hpp"
 #include "VoAACEncoder.hpp"
 #include "VadRecorder.hpp"
 
-#if defined(ANDROID)
-#include <android/log.h>
 #define TAG "VadRecorder"
-#define pr_dbg(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, TAG, fmt, ##__VA_ARGS__)
-#define pr_wrn(fmt, ...) __android_log_print(ANDROID_LOG_WARN,  TAG, fmt, ##__VA_ARGS__)
-#define pr_err(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, ##__VA_ARGS__)
-
-#else
-#define pr_dbg(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define pr_wrn(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-#define pr_err(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
-#endif
 
 class VoAACEncoderListener : public IAudioEncoderListener
 {
@@ -44,6 +35,20 @@ private:
     VadRecorderListener *mRecorderListener;
 };
 
+VadRecorder::VadRecorder()
+    : mRecorderListener(NULL),
+      mInited(false),
+      mEncoderType(ENCODER_AAC),
+      mEncoderHandle(NULL),
+      mEncoderListener(NULL),
+      mVadHandle(NULL),
+      mVoiceMarginMsMax(0),
+      mVoiceMarginMsVal(0),
+      mVoiceDetected(false),
+      mCacheBuffer(NULL),
+      mCacheBufferLength(0)
+{}
+
 VadRecorder::~VadRecorder()
 {
     if (mVadHandle != NULL)
@@ -52,15 +57,18 @@ VadRecorder::~VadRecorder()
         delete mEncoderHandle;
     if (mEncoderListener != NULL)
         delete mEncoderListener;
+    if (mCacheBuffer)
+        delete [] mCacheBuffer;
 }
 
 bool VadRecorder::init(VadRecorderListener *listener,
             int sampleRate, int channels, int bitsPerSample,
             EncoderType encoderType)
 {
+    pr_dbg("Init VadRecorder:%dHz/%dCh/%dBits, codec:%d",
+           sampleRate, channels, bitsPerSample, encoderType);
     if (mInited) {
-        pr_wrn("reconfig vadrecorder: %dHz/%dCh/%dBits, codec=%d",
-                sampleRate, channels, bitsPerSample, encoderType);
+        pr_wrn("Reconfig VadRecorder");
         deinit();
     }
 
@@ -77,8 +85,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
     switch (encoderType) {
     case ENCODER_AAC:
-        if (mEncoderHandle == NULL)
-            mEncoderHandle = new VoAACEncoder();
+        mEncoderHandle = new VoAACEncoder();
         mEncoderListener = new VoAACEncoderListener(listener);
         break;
     default:
@@ -95,7 +102,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
     mRecorderListener = listener;
     mEncoderType = encoderType;
     mVoiceDetected = false;
-    mVoiceMarginMs = 0;
+    mVoiceMarginMsVal = 0;
     mSampleRate = sampleRate;
     mChannels = channels;
     mBitsPerSample = bitsPerSample;
@@ -105,6 +112,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
 bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
 {
+    pr_dbg("Feed input buffer:%p, size:%d", inBuffer, inLength);
     if (!mInited) {
         pr_err("VadRecorder not inited");
         return false;
@@ -122,7 +130,7 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
         break;
     case LITEVAD_RESULT_SPEECH_END:
         mVoiceDetected = false;
-        mVoiceMarginMs = 0;
+        mVoiceMarginMsVal = 0;
         break;
     case LITEVAD_RESULT_ERROR:
         pr_err("Invalid litevad result");
@@ -132,24 +140,42 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
     }
 
     bool needEncode = mVoiceDetected;
-    if (mVoiceMarginMsMax > 0 && !mVoiceDetected) {
-        mVoiceMarginMs += inLength*1000/(mSampleRate*mChannels*mBitsPerSample/8);
-        if (mVoiceMarginMs <= mVoiceMarginMsMax)
+    if (!mVoiceDetected) {
+        if (mVoiceMarginMsMax > 0 && mVoiceMarginMsVal <= mVoiceMarginMsMax) {
             needEncode = true;
+            mVoiceMarginMsVal += inLength*1000/(mSampleRate*mChannels*mBitsPerSample/8);
+        }
     }
 
-    if (needEncode)
+    if (needEncode) {
+        if (mCacheBufferLength > 0) {
+            pr_dbg("Encode cache buffer:%p, size:%d", mCacheBuffer, mCacheBufferLength);
+            mEncoderHandle->encode(mCacheBuffer, mCacheBufferLength);
+            mCacheBufferLength = 0;
+        }
         return mEncoderHandle->encode(inBuffer, inLength) == IAudioEncoder::ENCODER_NOERROR;
-    else
+    } else {
+        if (mCacheBuffer == NULL) {
+            mCacheBuffer = new unsigned char[inLength];
+        } else if (mCacheBufferLength < inLength) {
+            delete [] mCacheBuffer;
+            mCacheBuffer = new unsigned char[inLength];
+        }
+        memcpy(mCacheBuffer, inBuffer, inLength);
+        mCacheBufferLength = inLength;
         return true;
+    }
 }
 
 void VadRecorder::deinit()
 {
+    pr_dbg("Deinit VadRecorder");
     if (mInited) {
         litevad_destroy(mVadHandle);
         mVadHandle = NULL;
         mEncoderHandle->deinit();
+        delete mEncoderHandle;
+        mEncoderHandle = NULL;
         delete mEncoderListener;
         mEncoderListener = NULL;
         mInited = false;
