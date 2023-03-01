@@ -113,7 +113,7 @@ int VoAACEncoder::init(IAudioEncoderListener *listener,
     return ENCODER_NOERROR;
 }
 
-int VoAACEncoder::encode(unsigned char *inBuffer, int inLength)
+int VoAACEncoder::encode(char *inBuffer, int inLength)
 {
     if ((VO_U32)inLength > mOutBuffer.Length) {
         VO_U32 newLength = (inLength/mOutBuffer.Length + 1) * mOutBuffer.Length;
@@ -160,7 +160,7 @@ int VoAACEncoder::encode(unsigned char *inBuffer, int inLength)
 
     mBytesRemain = inLength - bytesRead;
     while (mBytesRemain >= mBytesFrame) {
-        inData.Buffer = inBuffer + bytesRead;
+        inData.Buffer = (VO_PBYTE)inBuffer + bytesRead;
         inData.Length = mBytesFrame;
         mCodecApi.SetInputData(mCodecHandle, &inData);
 
@@ -181,7 +181,7 @@ int VoAACEncoder::encode(unsigned char *inBuffer, int inLength)
     }
 
     if (bytesEncoded > 0)
-        mListener->onOutputBufferAvailable(mOutBuffer.Buffer, bytesEncoded);
+        mListener->onOutputBufferAvailable((char *)(mOutBuffer.Buffer), bytesEncoded);
     return ENCODER_NOERROR;
 }
 

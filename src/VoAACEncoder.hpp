@@ -30,7 +30,7 @@ public:
     int init(IAudioEncoderListener *listener,
              int sampleRate, int channels, int bitsPerSample);
 
-    int encode(unsigned char *inBuffer, int inLength);
+    int encode(char *inBuffer, int inLength);
 
     void deinit();
 

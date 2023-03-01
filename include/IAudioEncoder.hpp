@@ -28,7 +28,7 @@ public:
      * \param outLength [IN] output buffer length in byte. 
      * \retval N/A.
      */
-    virtual void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) = 0;
+    virtual void onOutputBufferAvailable(char *outBuffer, int outLength) = 0;
     virtual ~IAudioEncoderListener() {}
 };
 
@@ -67,7 +67,7 @@ public:
      * \param inLength [IN] input buffer length in byte.
      * \retval ENCODER_NOERROR Succeeded. Others Failed.
      */
-    virtual int encode(unsigned char *inBuffer, int inLength) = 0;
+    virtual int encode(char *inBuffer, int inLength) = 0;
 
     /**
      * Uninit audio encoder.

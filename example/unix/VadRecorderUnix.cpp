@@ -36,7 +36,7 @@ public:
 
     ~VadRecorderListenerUnix() {}
 
-    void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) {
+    void onOutputBufferAvailable(char *outBuffer, int outLength) {
         if (mVoiceFile) fwrite(outBuffer, outLength, 1, mVoiceFile);
     }
 
@@ -83,7 +83,7 @@ static int PortAudio_InStreamCallback(const void *input, void *output,
 {
     VadRecorder *vadRecorder = static_cast<VadRecorder *>(user_data);
     unsigned long nbytes = frame_count*CHANNEL_COUNT*SAMPLE_BITS/8;
-    if (!vadRecorder->feed((unsigned char *)input, nbytes))
+    if (!vadRecorder->feed((char *)input, nbytes))
         pr_err("Failed to feed pcm data to VadRecorder");
     return paContinue;
 }

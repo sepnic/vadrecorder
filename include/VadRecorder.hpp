@@ -32,7 +32,7 @@ public:
      * \param outLength [IN] output buffer length in byte. 
      * \retval N/A.
      */
-    virtual void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) {
+    virtual void onOutputBufferAvailable(char *outBuffer, int outLength) {
         if (mFile) fwrite(outBuffer, outLength, 1, mFile);
     }
     /**
@@ -75,7 +75,7 @@ public:
 
     ~VadRecorder();
 
-    void setSpeechMarginMs(unsigned int marginMs) {
+    void setSpeechMarginMs(int marginMs) {
         mSpeechMarginMsMax = marginMs > 1000 ? marginMs : 1000;
     }
 
@@ -91,25 +91,26 @@ public:
               int sampleRate, int channels, int bitsPerSample,
               EncoderType encoderType = ENCODER_AAC);
 
-    bool feed(unsigned char *inBuffer, int inLength);
+    bool feed(char *inBuffer, int inLength);
 
     void deinit();
 
 private:
+    bool mInited;
     VadRecorderListener *mRecorderListener;
     int mSampleRate;
     int mChannels;
     int mBitsPerSample;
-    bool mInited;
     EncoderType mEncoderType;
     IAudioEncoder *mEncoderHandle;
     IAudioEncoderListener *mEncoderListener;
     void *mVadHandle;
     bool mSpeechDetected;
-    unsigned int mSpeechMarginMsMax;
-    unsigned int mSpeechMarginMsVal;
-    unsigned char *mCacheBuffer;
+    int mSpeechMarginMsMax;
+    int mSpeechMarginMsVal;
+    char *mCacheBuffer;
     int mCacheBufferLength;
+    int mCacheBufferFilled;
 };
 
 #endif // __VADRECORDER_H

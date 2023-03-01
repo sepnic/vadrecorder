@@ -28,7 +28,7 @@ class VoAACEncoderListener : public IAudioEncoderListener
 public:
     VoAACEncoderListener(VadRecorderListener *listener)
         : mRecorderListener(listener) {}
-    void onOutputBufferAvailable(unsigned char *outBuffer, int outLength) {
+    void onOutputBufferAvailable(char *outBuffer, int outLength) {
         mRecorderListener->onOutputBufferAvailable(outBuffer, outLength);
     }
 private:
@@ -36,8 +36,8 @@ private:
 };
 
 VadRecorder::VadRecorder()
-    : mRecorderListener(NULL),
-      mInited(false),
+    : mInited(false),
+      mRecorderListener(NULL),
       mEncoderType(ENCODER_AAC),
       mEncoderHandle(NULL),
       mEncoderListener(NULL),
@@ -46,7 +46,8 @@ VadRecorder::VadRecorder()
       mSpeechMarginMsMax(0),
       mSpeechMarginMsVal(0),
       mCacheBuffer(NULL),
-      mCacheBufferLength(0)
+      mCacheBufferLength(0),
+      mCacheBufferFilled(0)
 {}
 
 VadRecorder::~VadRecorder()
@@ -103,6 +104,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
     mEncoderType = encoderType;
     mSpeechDetected = false;
     mSpeechMarginMsVal = 0;
+    mCacheBufferFilled = 0;
     mSampleRate = sampleRate;
     mChannels = channels;
     mBitsPerSample = bitsPerSample;
@@ -110,7 +112,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
     return mInited;
 }
 
-bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
+bool VadRecorder::feed(char *inBuffer, int inLength)
 {
     pr_dbg("Feed input buffer:%p, size:%d", inBuffer, inLength);
     if (!mInited) {
@@ -138,7 +140,7 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
         break;
     case LITEVAD_RESULT_ERROR:
         pr_err("Invalid litevad result");
-        return false;
+        break;
     default:
         break;
     }
@@ -154,21 +156,23 @@ bool VadRecorder::feed(unsigned char *inBuffer, int inLength)
     }
 
     if (needEncode) {
-        if (mCacheBufferLength > 0) {
-            pr_dbg("Encode cache buffer:%p, size:%d", mCacheBuffer, mCacheBufferLength);
-            mEncoderHandle->encode(mCacheBuffer, mCacheBufferLength);
-            mCacheBufferLength = 0;
+        if (mCacheBufferFilled > 0) {
+            pr_dbg("Encode cache buffer:%p, size:%d", mCacheBuffer, mCacheBufferFilled);
+            mEncoderHandle->encode(mCacheBuffer, mCacheBufferFilled);
+            mCacheBufferFilled = 0;
         }
         return mEncoderHandle->encode(inBuffer, inLength) == IAudioEncoder::ENCODER_NOERROR;
     } else {
         if (mCacheBuffer == NULL) {
-            mCacheBuffer = new unsigned char[inLength];
+            mCacheBuffer = new char[inLength];
+            mCacheBufferLength = inLength;
         } else if (mCacheBufferLength < inLength) {
             delete [] mCacheBuffer;
-            mCacheBuffer = new unsigned char[inLength];
+            mCacheBuffer = new char[inLength];
+            mCacheBufferLength = inLength;
         }
         memcpy(mCacheBuffer, inBuffer, inLength);
-        mCacheBufferLength = inLength;
+        mCacheBufferFilled = inLength;
         return true;
     }
 }
