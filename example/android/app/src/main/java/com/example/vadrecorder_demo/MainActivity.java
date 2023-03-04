@@ -43,6 +43,8 @@ public class MainActivity extends Activity {
     private String mRecordVoiceFile;
     private String mRecordTimestampFile;
     private TextView mStatusView;
+    private static final int RECORD_SAMPLE_RATE = 16000;
+    private static final int RECORD_MARGIN_MS = 1*60*1000;
     private static final String RECORD_VOICE_FILE = "record_voice.aac";
     private static final String RECORD_TIMESTAMP_FILE = "record_timestamp.txt";
     private static final int PERMISSIONS_REQUEST_CODE_AUDIO = 1;
@@ -146,14 +148,15 @@ public class MainActivity extends Activity {
 
     private void startRecording() {
         Log.d(TAG, "startRecording");
-        int sampleRate = 16000;
+        int sampleRate = RECORD_SAMPLE_RATE;
         int channelConfig = AudioFormat.CHANNEL_IN_MONO;
         int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
         int bytesPer10Ms = sampleRate/100*2;
         mBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat);
         mBufferSize = (mBufferSize/bytesPer10Ms + 1)*bytesPer10Ms;
         mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, mBufferSize);
-        native_init(mVadRecorderHandle, mRecordVoiceFile, mRecordTimestampFile, sampleRate, 1, 16);
+        native_init(mVadRecorderHandle, mRecordVoiceFile, mRecordTimestampFile,
+                sampleRate, 1, 16, RECORD_MARGIN_MS);
 
         mRecordThread = new Thread(new Runnable() {
             @Override
@@ -189,7 +192,8 @@ public class MainActivity extends Activity {
      */
     private native long native_create();
     private native boolean native_init(long handle, String voiceFile, String timestampFile,
-                                       int sampleRate, int channels, int bitsPerSample) throws IllegalStateException;
+                                       int sampleRate, int channels, int bitsPerSample,
+                                       int marginMs) throws IllegalStateException;
     private native boolean  native_feed(long handle, byte[] buff, int size) throws IllegalStateException;
     private native void native_deinit(long handle) throws IllegalStateException;
     private native void native_destroy(long handle) throws IllegalStateException;

@@ -28,8 +28,6 @@
 #define JAVA_CLASS_NAME "com/example/vadrecorder_demo/MainActivity"
 #define NELEM(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
-static const int kSpeechMarginMs = (1*60*1000); // in ms
-
 class VadRecorderListenerJni : public VadRecorderListener
 {
 public:
@@ -77,7 +75,6 @@ public:
     VadRecorderWrapperJni() : mRecordVoiceFile(nullptr), mRecordTimestampFile(nullptr) {
         mVadRecorder = new VadRecorder();
         mVadRecorderListener = new VadRecorderListenerJni();
-        mVadRecorder->setSpeechMarginMs(kSpeechMarginMs);
     }
     ~VadRecorderWrapperJni() {
         delete mVadRecorder;
@@ -117,7 +114,7 @@ static jlong VadRecorder_Create(JNIEnv* env, jobject thiz)
 
 static jboolean VadRecorder_Init(JNIEnv *env, jobject thiz, jlong handle,
                                 jstring voiceFilePath, jstring timestampFilePath,
-                                jint sampleRate, jint channels, jint bitsPerSample)
+                                jint sampleRate, jint channels, jint bitsPerSample, jint marginMs)
 {
     pr_dbg("VadRecorderInit: %dHz/%dCh/%dBits", sampleRate, channels, bitsPerSample);
     auto recorderWrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
@@ -141,6 +138,7 @@ static jboolean VadRecorder_Init(JNIEnv *env, jobject thiz, jlong handle,
     recorderWrapper->mVadRecorderListener->setVoiceFile(recorderWrapper->mRecordVoiceFile);
     recorderWrapper->mVadRecorderListener->setTimestampFile(recorderWrapper->mRecordTimestampFile);
 
+    recorderWrapper->mVadRecorder->setSpeechMarginMs(marginMs);
     ret = recorderWrapper->mVadRecorder->init(recorderWrapper->mVadRecorderListener,
                                               sampleRate, channels, bitsPerSample);
     if (!ret)
@@ -200,7 +198,7 @@ static void VadRecorder_Destroy(JNIEnv *env, jobject thiz, jlong handle)
 
 static JNINativeMethod gMethods[] = {
         {"native_create", "()J", (void *)VadRecorder_Create},
-        {"native_init", "(JLjava/lang/String;Ljava/lang/String;III)Z", (void *)VadRecorder_Init},
+        {"native_init", "(JLjava/lang/String;Ljava/lang/String;IIII)Z", (void *)VadRecorder_Init},
         {"native_feed", "(J[BI)Z", (void *)VadRecorder_Feed},
         {"native_deinit", "(J)V", (void *) VadRecorder_Deinit},
         {"native_destroy", "(J)V", (void *) VadRecorder_Destroy},
