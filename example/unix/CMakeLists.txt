@@ -46,8 +46,7 @@ set (VOAAC_SRC
     ${VOAAC_DIR}/aacenc/src/stat_bits.c
     ${VOAAC_DIR}/aacenc/src/tns.c
     ${VOAAC_DIR}/aacenc/src/transform.c
-    ${VOAAC_DIR}/aacenc/src/memalign.c
-)
+    ${VOAAC_DIR}/aacenc/src/memalign.c)
 
 # WEBRTC_SRC source files
 set(WEBRTC_SRC
@@ -70,7 +69,8 @@ set(WEBRTC_SRC
 set(VADREC_SRC
     ${VADREC_DIR}/VadRecorder.cpp
     ${VADREC_DIR}/VoAACEncoder.cpp
-    ${VADREC_DIR}/litevad.c)
+    ${VADREC_DIR}/litevad.c
+    ${VADREC_DIR}/lockfree_ringbuf.c)
 
 # libvadrecorder
 add_library(vadrecorder STATIC ${VADREC_SRC} ${VOAAC_SRC} ${WEBRTC_SRC})

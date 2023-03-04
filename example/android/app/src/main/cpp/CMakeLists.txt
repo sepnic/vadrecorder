@@ -67,7 +67,8 @@ set(WEBRTC_SRC
 set(VADREC_SRC
     ${VADREC_DIR}/VadRecorder.cpp
     ${VADREC_DIR}/VoAACEncoder.cpp
-    ${VADREC_DIR}/litevad.c)
+    ${VADREC_DIR}/litevad.c
+    ${VADREC_DIR}/lockfree_ringbuf.c)
 
 add_library(vadrecorder-jni SHARED vadrecorder-jni.cpp ${VADREC_SRC} ${VOAAC_SRC} ${WEBRTC_SRC})
 

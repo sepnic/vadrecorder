@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     private String mRecordTimestampFile;
     private TextView mStatusView;
     private static final int RECORD_SAMPLE_RATE = 16000;
-    private static final int RECORD_MARGIN_MS = 1*60*1000;
+    private static final int RECORD_MARGIN_MS = 5*1000;
     private static final String RECORD_VOICE_FILE = "record_voice.aac";
     private static final String RECORD_TIMESTAMP_FILE = "record_timestamp.txt";
     private static final int PERMISSIONS_REQUEST_CODE_AUDIO = 1;

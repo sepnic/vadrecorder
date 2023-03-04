@@ -29,11 +29,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-public class SilenceMusicService extends Service implements MediaPlayer.OnCompletionListener {
+public class SilenceMusicService extends Service {
     private MediaPlayer mMediaPlayer = null;
     private AudioManager mAudioManager = null;
     private final Handler mHandler = new Handler();
-    private boolean mStopped = false;
     private File mSilenceMp3File;
     private static final String mSilenceMp3base64 =
         "//OIxAAAAAAAAAAAAFhpbmcAAAAPAAAAHgAABVgACAgIERERGRkZIiIiIioqKjMzMzs" +
@@ -106,12 +105,10 @@ public class SilenceMusicService extends Service implements MediaPlayer.OnComple
     @Override
     public void onCreate() {
         super.onCreate();
-        mStopped = false;
     }
 
     @Override
     public void onDestroy() {
-        mStopped = true;
         stopMediaPlayer();
         super.onDestroy();
     }
@@ -123,22 +120,10 @@ public class SilenceMusicService extends Service implements MediaPlayer.OnComple
             mAudioManager.requestAudioFocus(mAudioFocusChange, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
         if (mMediaPlayer == null) {
             mMediaPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(mSilenceMp3File.getAbsolutePath()));
-            mMediaPlayer.setOnCompletionListener(this);
+            mMediaPlayer.setLooping(true);
         }
         startMediaPlayer();
         return START_STICKY;
-    }
-
-    @Override
-    public void onCompletion(MediaPlayer mp) {
-        if (!mStopped) {
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    startMediaPlayer();
-                }
-            }, 10 * 1000);
-        }
     }
 
     private void startMediaPlayer() {

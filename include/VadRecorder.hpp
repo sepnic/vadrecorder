@@ -108,9 +108,9 @@ private:
     bool mSpeechDetected;
     int mSpeechMarginMsMax;
     int mSpeechMarginMsVal;
-    char *mCacheBuffer;
-    int mCacheBufferLength;
-    int mCacheBufferFilled;
+    void *mCacheRingbuf;
+    char *mTempBuffer;
+    int mTempBufferLength;
 };
 
 #endif // __VADRECORDER_H

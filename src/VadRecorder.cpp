@@ -19,6 +19,7 @@
 #include "litevad.h"
 #include "IAudioEncoder.hpp"
 #include "VoAACEncoder.hpp"
+#include "lockfree_ringbuf.h"
 #include "VadRecorder.hpp"
 
 #define TAG "VadRecorder"
@@ -45,9 +46,9 @@ VadRecorder::VadRecorder()
       mSpeechDetected(false),
       mSpeechMarginMsMax(0),
       mSpeechMarginMsVal(0),
-      mCacheBuffer(NULL),
-      mCacheBufferLength(0),
-      mCacheBufferFilled(0)
+      mCacheRingbuf(NULL),
+      mTempBuffer(NULL),
+      mTempBufferLength(0)
 {}
 
 VadRecorder::~VadRecorder()
@@ -58,8 +59,10 @@ VadRecorder::~VadRecorder()
         delete mEncoderHandle;
     if (mEncoderListener != NULL)
         delete mEncoderListener;
-    if (mCacheBuffer)
-        delete [] mCacheBuffer;
+    if (mTempBuffer != NULL)
+        delete [] mTempBuffer;
+    if (mCacheRingbuf != NULL)
+        lockfree_ringbuf_destroy(mCacheRingbuf);
 }
 
 bool VadRecorder::init(VadRecorderListener *listener,
@@ -75,6 +78,16 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
     if (listener == NULL) {
         pr_err("Invalid recorder listener");
+        return false;
+    }
+
+    int frameCountPer10Ms = sampleRate/100;
+    int frameBytesPer10Ms = frameCountPer10Ms*channels*bitsPerSample/8;
+    mTempBufferLength = frameBytesPer10Ms*10; // temp buffer for 100ms data
+    mTempBuffer = new char[mTempBufferLength];
+    mCacheRingbuf = lockfree_ringbuf_create(frameBytesPer10Ms*100);// cache ringbuf for 1s data
+    if (mTempBuffer == NULL || mCacheRingbuf == NULL) {
+        pr_err("Failed to allocate cache buffer");
         return false;
     }
 
@@ -104,7 +117,6 @@ bool VadRecorder::init(VadRecorderListener *listener,
     mEncoderType = encoderType;
     mSpeechDetected = false;
     mSpeechMarginMsVal = 0;
-    mCacheBufferFilled = 0;
     mSampleRate = sampleRate;
     mChannels = channels;
     mBitsPerSample = bitsPerSample;
@@ -156,23 +168,20 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
     }
 
     if (needEncode) {
-        if (mCacheBufferFilled > 0) {
-            pr_dbg("Encode cache buffer:%p, size:%d", mCacheBuffer, mCacheBufferFilled);
-            mEncoderHandle->encode(mCacheBuffer, mCacheBufferFilled);
-            mCacheBufferFilled = 0;
+        int cacheSize = lockfree_ringbuf_bytes_filled(mCacheRingbuf);
+        pr_dbg("Encode cache buffer: size:%d", cacheSize);
+        while (cacheSize > 0) {
+            int readSize = lockfree_ringbuf_read(mCacheRingbuf, mTempBuffer, mTempBufferLength);
+            if (readSize > 0) {
+                mEncoderHandle->encode(mTempBuffer, readSize);
+                cacheSize -= readSize;
+            } else {
+                break;
+            }
         }
         return mEncoderHandle->encode(inBuffer, inLength) == IAudioEncoder::ENCODER_NOERROR;
     } else {
-        if (mCacheBuffer == NULL) {
-            mCacheBuffer = new char[inLength];
-            mCacheBufferLength = inLength;
-        } else if (mCacheBufferLength < inLength) {
-            delete [] mCacheBuffer;
-            mCacheBuffer = new char[inLength];
-            mCacheBufferLength = inLength;
-        }
-        memcpy(mCacheBuffer, inBuffer, inLength);
-        mCacheBufferFilled = inLength;
+        lockfree_ringbuf_write(mCacheRingbuf, inBuffer, inLength);
         return true;
     }
 }
@@ -188,6 +197,10 @@ void VadRecorder::deinit()
         mEncoderHandle = NULL;
         delete mEncoderListener;
         mEncoderListener = NULL;
+        delete [] mTempBuffer;
+        mTempBuffer = NULL;
+        lockfree_ringbuf_destroy(mCacheRingbuf);
+        mCacheRingbuf = NULL;
         mInited = false;
     }
 }

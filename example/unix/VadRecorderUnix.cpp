@@ -26,7 +26,7 @@
 #define SAMPLE_RATE      16000
 #define CHANNEL_COUNT    1
 #define SAMPLE_BITS      16
-#define SPEECH_MARGIN    (1*60*1000) // in ms
+#define SPEECH_MARGIN    (5*1000) // in ms
 
 class VadRecorderListenerUnix : public VadRecorderListener
 {
