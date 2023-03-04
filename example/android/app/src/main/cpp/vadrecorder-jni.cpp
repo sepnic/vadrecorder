@@ -28,7 +28,7 @@
 #define JAVA_CLASS_NAME "com/example/vadrecorder_demo/MainActivity"
 #define NELEM(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
-static const int kSpeechMarginMs = 3000; // in ms
+static const int kSpeechMarginMs = (1*60*1000); // in ms
 
 class VadRecorderListenerJni : public VadRecorderListener
 {
@@ -41,7 +41,13 @@ public:
     void onSpeechBegin() { updateTimestampFile("Speech Begin"); }
     void onSpeechEnd() { updateTimestampFile("Speech End"); }
     void onMarginBegin() { updateTimestampFile("Margin Begin"); }
-    void onMarginEnd() { updateTimestampFile("Margin End"); }
+    void onMarginEnd() {
+        updateTimestampFile("Margin End");
+        if (mVoiceFile != nullptr)
+            fflush(mVoiceFile);
+        if (mTimestampFile != nullptr)
+            fflush(mTimestampFile);
+    }
 private:
     FILE *mVoiceFile;
     FILE *mTimestampFile;

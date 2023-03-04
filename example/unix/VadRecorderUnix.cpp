@@ -26,40 +26,26 @@
 #define SAMPLE_RATE      16000
 #define CHANNEL_COUNT    1
 #define SAMPLE_BITS      16
-#define SPEECH_MARGIN    (3*1000) // in ms
+#define SPEECH_MARGIN    (1*60*1000) // in ms
 
 class VadRecorderListenerUnix : public VadRecorderListener
 {
 public:
     VadRecorderListenerUnix(FILE *voiceFile, FILE *timestampFile)
       : mVoiceFile(voiceFile), mTimestampFile(timestampFile) {}
-
     ~VadRecorderListenerUnix() {}
-
-    void onOutputBufferAvailable(char *outBuffer, int outLength) {
-        if (mVoiceFile) fwrite(outBuffer, outLength, 1, mVoiceFile);
-    }
-
-    void onSpeechBegin() {
-        updateTimestampFile("Speech Begin");
-    }
-
-    void onSpeechEnd() {
-        updateTimestampFile("Speech End");
-    }
-
-    void onMarginBegin() {
-        updateTimestampFile("Margin Begin");
-    }
-
-    void onMarginEnd() {
-        updateTimestampFile("Margin End");
-    }
-
+    void onOutputBufferAvailable(char *outBuffer, int outLength) { updateVoiceFile(outBuffer, outLength); }
+    void onSpeechBegin() { updateTimestampFile("Speech Begin"); }
+    void onSpeechEnd() { updateTimestampFile("Speech End"); }
+    void onMarginBegin() { updateTimestampFile("Margin Begin"); }
+    void onMarginEnd() { updateTimestampFile("Margin End"); }
 private:
     FILE *mVoiceFile;
     FILE *mTimestampFile;
-
+    void updateVoiceFile(char *outBuffer, int outLength) {
+        if (mVoiceFile != NULL)
+            fwrite(outBuffer, outLength, 1, mVoiceFile);
+    }
     void updateTimestampFile(const char *event) {
         char buffer[128];
         struct tm now;
@@ -72,7 +58,7 @@ private:
                 now.tm_year+1900, now.tm_mon+1, now.tm_mday,
                 now.tm_hour, now.tm_min, now.tm_sec, (int)((ts.tv_nsec/1000000)%1000),
                 event);
-        if (mTimestampFile)
+        if (mTimestampFile != NULL)
             fwrite(buffer, ret, 1, mTimestampFile);
     }
 };

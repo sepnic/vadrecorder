@@ -4,8 +4,6 @@ android {
     compileSdkVersion 30
     buildToolsVersion "30.0.1"
 
-    ndkVersion "25.2.9519653"
-
     defaultConfig {
         applicationId "com.example.vadrecorder_demo"
         minSdkVersion 22

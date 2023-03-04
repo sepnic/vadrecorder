@@ -18,13 +18,14 @@ package com.example.vadrecorder_demo;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
-import android.util.Log;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,20 +35,20 @@ import androidx.core.app.ActivityCompat;
 public class MainActivity extends Activity {
     private static final String TAG = "VadRecorderDemo";
     private long mVadRecorderHandle = 0;
-    private AudioRecord mAudioRecord;
-    Thread mRecordThread;
+    private AudioRecord mAudioRecord = null;
+    private Thread mRecordThread;
     private boolean mRecording = false;
     private boolean mStarted = false;
     private int mBufferSize;
+    private String mRecordVoiceFile;
+    private String mRecordTimestampFile;
     private TextView mStatusView;
     private static final String RECORD_VOICE_FILE = "record_voice.aac";
-    private static final String  RECORD_TIMESTAMP_FILE = "record_timestamp.txt";
-    private static String mRecordVoiceFile;
-    private static String mRecordTimestampFile;
+    private static final String RECORD_TIMESTAMP_FILE = "record_timestamp.txt";
     private static final int PERMISSIONS_REQUEST_CODE_AUDIO = 1;
     private static final int PERMISSIONS_REQUEST_CODE_EXTERNAL_STORAGE = 2;
 
-    public static void requestPermissions(Activity activity) {
+    private void requestPermissions(Activity activity) {
         // request audio permissions
         if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             String[] PERMISSION_AUDIO = { Manifest.permission.RECORD_AUDIO };
@@ -91,6 +92,9 @@ public class MainActivity extends Activity {
 
         requestPermissions(this);
 
+        mStatusView = findViewById(R.id.statusView);
+        mStatusView.setText("Idle");
+
         mVadRecorderHandle = native_create();
 
         String sdcardPath = "/storage/emulated/0";
@@ -99,9 +103,6 @@ public class MainActivity extends Activity {
         }
         mRecordVoiceFile = sdcardPath + "/" + RECORD_VOICE_FILE;
         mRecordTimestampFile = sdcardPath + "/" + RECORD_TIMESTAMP_FILE;
-
-        mStatusView = findViewById(R.id.statusView);
-        mStatusView.setText("Idle");
     }
 
     @Override
@@ -128,6 +129,8 @@ public class MainActivity extends Activity {
             mStarted = true;
             startRecording();
             mStatusView.setText("Recording");
+            // start SilenceMusicService in order to keep recorder alive
+            startService(new Intent(getApplicationContext(), SilenceMusicService.class));
         }
     }
 
@@ -136,6 +139,8 @@ public class MainActivity extends Activity {
             stopRecording();
             mStarted = false;
             mStatusView.setText("Idle");
+            // stop SilenceMusicService when recorder stopped
+            stopService(new Intent(getApplicationContext(), SilenceMusicService.class));
         }
     }
 
@@ -170,7 +175,6 @@ public class MainActivity extends Activity {
                 mRecording = false;
             }
         });
-
         mRecordThread.start();
     }
 
