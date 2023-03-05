@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4.1)
 
 # cflags
-set(CMAKE_C_FLAGS   "-Wall -Werror -std=gnu99")
+set(CMAKE_C_FLAGS   "-Wall -Werror -std=gnu11")
 set(CMAKE_CXX_FLAGS "-Wall -Werror -std=c++11")
 
 set(TOP_DIR         "${CMAKE_SOURCE_DIR}/../../../../../..")

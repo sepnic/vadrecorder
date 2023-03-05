@@ -2,11 +2,9 @@ cmake_minimum_required(VERSION 2.8)
 
 project(vadrecorder)
 
-set(CMAKE_SYSTEM_NAME LINUX)
-
 # cflags
-set(CMAKE_C_FLAGS   "-Wall -Werror")
-set(CMAKE_CXX_FLAGS "-Wall -Werror")
+set(CMAKE_C_FLAGS   "-Wall -Werror -std=gnu11")
+set(CMAKE_CXX_FLAGS "-Wall -Werror -std=c++11")
 
 set(TOP_DIR     "${CMAKE_SOURCE_DIR}/..")
 set(VOAAC_DIR   "${TOP_DIR}/thirdparty/aacenc")
