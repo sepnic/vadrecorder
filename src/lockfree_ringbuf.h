@@ -31,9 +31,11 @@ int lockfree_ringbuf_bytes_available(void *handle);
 
 int lockfree_ringbuf_bytes_filled(void *handle);
 
-void lockfree_ringbuf_reset(void *handle);
+void lockfree_ringbuf_allow_unsafe_overwrite(void *handle, bool allow);
 
-int lockfree_ringbuf_discard(void *handle, int len);
+void lockfree_ringbuf_unsafe_reset(void *handle);
+
+int lockfree_ringbuf_unsafe_discard(void *handle, int len);
 
 int lockfree_ringbuf_read(void *handle, char *buf, int len);
 

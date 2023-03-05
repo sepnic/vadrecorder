@@ -26,6 +26,7 @@ struct lockfree_ringbuf {
     char *volatile p_w;          /**< Write pointer */
     int  fill_cnt;               /**< Number of filled slots */
     int  size;                   /**< Buffer size */
+    bool allow_overwrite;
 };
 
 void *lockfree_ringbuf_create(int size)
@@ -37,6 +38,7 @@ void *lockfree_ringbuf_create(int size)
         return NULL;
     rb->size = size;
     rb->fill_cnt = 0;
+    rb->allow_overwrite = false;
     rb->p_o = rb->p_r = rb->p_w = malloc(size);
     if (rb->p_o == NULL) {
         free(rb);
@@ -73,7 +75,15 @@ int lockfree_ringbuf_bytes_filled(void *handle)
     return rb->fill_cnt;
 }
 
-void lockfree_ringbuf_reset(void *handle)
+void lockfree_ringbuf_allow_unsafe_overwrite(void *handle, bool allow)
+{
+    struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL)
+        return;
+    rb->allow_overwrite = allow;
+}
+
+void lockfree_ringbuf_unsafe_reset(void *handle)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL)
@@ -82,7 +92,7 @@ void lockfree_ringbuf_reset(void *handle)
     rb->fill_cnt = 0;
 }
 
-int lockfree_ringbuf_discard(void *handle, int len)
+int lockfree_ringbuf_unsafe_discard(void *handle, int len)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL || len <= 0)
@@ -129,9 +139,11 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
     if (rb == NULL || buf == NULL || len <= 0)
         return -1;
     if (len < rb->size) {
-        if (lockfree_ringbuf_bytes_available(rb) < len) {
-            int discard = len - lockfree_ringbuf_bytes_available(rb);
-            lockfree_ringbuf_discard(rb, discard);
+        int available = lockfree_ringbuf_bytes_available(rb);
+        if (available < len) {
+            if (!rb->allow_overwrite)
+                return -1;
+            lockfree_ringbuf_unsafe_discard(rb, len-available);
         }
         if ((rb->p_w + len) > (rb->p_o + rb->size)) {
             int wlen1 = rb->p_o + rb->size - rb->p_w;
@@ -145,6 +157,8 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
         }
         rb->fill_cnt += len;
     } else {
+        if (!rb->allow_overwrite)
+            return -1;
         buf = buf + len - rb->size;
         len = rb->size;
         memcpy(rb->p_o, buf, len);

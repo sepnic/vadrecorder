@@ -24,6 +24,8 @@
 
 #define TAG "VadRecorder"
 
+static const int kCacheTimeInMs = 1000;
+
 class VoAACEncoderListener : public IAudioEncoderListener
 {
 public:
@@ -85,11 +87,12 @@ bool VadRecorder::init(VadRecorderListener *listener,
     int frameBytesPer10Ms = frameCountPer10Ms*channels*bitsPerSample/8;
     mTempBufferLength = frameBytesPer10Ms*10; // temp buffer for 100ms data
     mTempBuffer = new char[mTempBufferLength];
-    mCacheRingbuf = lockfree_ringbuf_create(frameBytesPer10Ms*100);// cache ringbuf for 1s data
+    mCacheRingbuf = lockfree_ringbuf_create(frameBytesPer10Ms*kCacheTimeInMs/10);
     if (mTempBuffer == NULL || mCacheRingbuf == NULL) {
         pr_err("Failed to allocate cache buffer");
         return false;
     }
+    lockfree_ringbuf_allow_unsafe_overwrite(mCacheRingbuf, true);
 
     mVadHandle = litevad_create(sampleRate, channels);
     if (mVadHandle == NULL) {
