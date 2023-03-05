@@ -92,7 +92,6 @@ bool VadRecorder::init(VadRecorderListener *listener,
         pr_err("Failed to allocate cache buffer");
         return false;
     }
-    lockfree_ringbuf_allow_unsafe_overwrite(mCacheRingbuf, true);
 
     mVadHandle = litevad_create(sampleRate, channels);
     if (mVadHandle == NULL) {
@@ -184,7 +183,7 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
         }
         return mEncoderHandle->encode(inBuffer, inLength) == IAudioEncoder::ENCODER_NOERROR;
     } else {
-        lockfree_ringbuf_write(mCacheRingbuf, inBuffer, inLength);
+        lockfree_ringbuf_unsafe_overwrite(mCacheRingbuf, inBuffer, inLength);
         return true;
     }
 }

@@ -50,7 +50,6 @@ struct lockfree_ringbuf {
     char *volatile p_w;          /**< Write pointer */
     ATOMIC_DECLARE(filled_size); /**< Number of filled slots */
     int  buffer_size;            /**< Buffer buffer_size */
-    bool allow_overwrite;
 };
 
 void *lockfree_ringbuf_create(int size)
@@ -62,7 +61,6 @@ void *lockfree_ringbuf_create(int size)
         return NULL;
     rb->buffer_size = size;
     ATOMIC_INIT(rb->filled_size, 0);
-    rb->allow_overwrite = false;
     rb->p_o = rb->p_r = rb->p_w = malloc(size);
     if (rb->p_o == NULL) {
         free(rb);
@@ -105,14 +103,6 @@ int lockfree_ringbuf_bytes_filled(void *handle)
     return ATOMIC_LOAD(rb->filled_size);
 }
 
-void lockfree_ringbuf_allow_unsafe_overwrite(void *handle, bool allow)
-{
-    struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
-    if (rb == NULL)
-        return;
-    rb->allow_overwrite = allow;
-}
-
 void lockfree_ringbuf_unsafe_reset(void *handle)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
@@ -142,6 +132,57 @@ int lockfree_ringbuf_unsafe_discard(void *handle, int len)
     return len;
 }
 
+int lockfree_ringbuf_unsafe_overwrite(void *handle, char *buf, int len)
+{
+    struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL || buf == NULL || len <= 0)
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
+    if (len <= rb->buffer_size) {
+        int available = rb->buffer_size - ATOMIC_LOAD(rb->filled_size);
+        if (len > available)
+            lockfree_ringbuf_unsafe_discard(rb, len-available);
+        if ((rb->p_w + len) > (rb->p_o + rb->buffer_size)) {
+            int wlen1 = rb->p_o + rb->buffer_size - rb->p_w;
+            int wlen2 = len - wlen1;
+            memcpy(rb->p_w, buf, wlen1);
+            memcpy(rb->p_o, buf + wlen1, wlen2);
+            rb->p_w = rb->p_o + wlen2;
+        } else {
+            memcpy(rb->p_w, buf, len);
+            rb->p_w = rb->p_w + len;
+        }
+        ATOMIC_FETCH_ADD(rb->filled_size, len);
+    } else {
+        buf = buf + len - rb->buffer_size;
+        memcpy(rb->p_o, buf, rb->buffer_size);
+        rb->p_w = rb->p_o + rb->buffer_size;
+        rb->p_r = rb->p_o;
+        ATOMIC_STORE(rb->filled_size, rb->buffer_size);
+    }
+    return len;
+}
+
+int lockfree_ringbuf_write(void *handle, char *buf, int len)
+{
+    struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL || buf == NULL || len <= 0)
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
+    if (len > (rb->buffer_size-ATOMIC_LOAD(rb->filled_size)))
+        return LOCKFREE_RINGBUF_ERROR_INSUFFICIENT_WRITEABLE_BUFFER;
+    if ((rb->p_w + len) > (rb->p_o + rb->buffer_size)) {
+        int wlen1 = rb->p_o + rb->buffer_size - rb->p_w;
+        int wlen2 = len - wlen1;
+        memcpy(rb->p_w, buf, wlen1);
+        memcpy(rb->p_o, buf + wlen1, wlen2);
+        rb->p_w = rb->p_o + wlen2;
+    } else {
+        memcpy(rb->p_w, buf, len);
+        rb->p_w = rb->p_w + len;
+    }
+    ATOMIC_FETCH_ADD(rb->filled_size, len);
+    return len;
+}
+
 int lockfree_ringbuf_read(void *handle, char *buf, int len)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
@@ -161,39 +202,6 @@ int lockfree_ringbuf_read(void *handle, char *buf, int len)
             rb->p_r = rb->p_r + len;
         }
         ATOMIC_FETCH_SUB(rb->filled_size, len);
-    }
-    return len;
-}
-
-int lockfree_ringbuf_write(void *handle, char *buf, int len)
-{
-    struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
-    if (rb == NULL || buf == NULL || len <= 0)
-        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
-    int available = rb->buffer_size - ATOMIC_LOAD(rb->filled_size);
-    if (len > available && !rb->allow_overwrite)
-        return LOCKFREE_RINGBUF_ERROR_INSUFFICIENT_WRITEABLE_BUFFER;
-    if (len <= rb->buffer_size) {
-        if (len > available)
-            lockfree_ringbuf_unsafe_discard(rb, len-available);
-        if ((rb->p_w + len) > (rb->p_o + rb->buffer_size)) {
-            int wlen1 = rb->p_o + rb->buffer_size - rb->p_w;
-            int wlen2 = len - wlen1;
-            memcpy(rb->p_w, buf, wlen1);
-            memcpy(rb->p_o, buf + wlen1, wlen2);
-            rb->p_w = rb->p_o + wlen2;
-        } else {
-            memcpy(rb->p_w, buf, len);
-            rb->p_w = rb->p_w + len;
-        }
-        ATOMIC_FETCH_ADD(rb->filled_size, len);
-    } else {
-        buf = buf + len - rb->buffer_size;
-        len = rb->buffer_size;
-        memcpy(rb->p_o, buf, len);
-        rb->p_w = rb->p_o + len;
-        rb->p_r = rb->p_o;
-        ATOMIC_STORE(rb->filled_size, len);
     }
     return len;
 }
