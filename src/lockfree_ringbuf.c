@@ -24,6 +24,7 @@ struct lockfree_ringbuf {
     char *p_o;                   /**< Original pointer */
     char *volatile p_r;          /**< Read pointer */
     char *volatile p_w;          /**< Write pointer */
+    // TODO: make fill_cnt atomic, since both read thread and write thread will modify it
     int  fill_cnt;               /**< Number of filled slots */
     int  size;                   /**< Buffer size */
     bool allow_overwrite;
@@ -60,18 +61,24 @@ void lockfree_ringbuf_destroy(void *handle)
 int lockfree_ringbuf_get_size(void *handle)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL)
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     return rb->size;
 }
 
 int lockfree_ringbuf_bytes_available(void *handle)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL)
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     return (rb->size - rb->fill_cnt);
 }
 
 int lockfree_ringbuf_bytes_filled(void *handle)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
+    if (rb == NULL)
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     return rb->fill_cnt;
 }
 
@@ -96,7 +103,7 @@ int lockfree_ringbuf_unsafe_discard(void *handle, int len)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL || len <= 0)
-        return -1;
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     len = (len > rb->fill_cnt) ? rb->fill_cnt : len;
     if (len > 0) {
         if ((rb->p_r + len) > (rb->p_o + rb->size)) {
@@ -115,7 +122,7 @@ int lockfree_ringbuf_read(void *handle, char *buf, int len)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL || buf == NULL || len <= 0)
-        return -1;
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     len = (len > rb->fill_cnt) ? rb->fill_cnt : len;
     if (len > 0) {
         if ((rb->p_r + len) > (rb->p_o + rb->size)) {
@@ -137,12 +144,12 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
 {
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL || buf == NULL || len <= 0)
-        return -1;
+        return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
     if (len < rb->size) {
         int available = lockfree_ringbuf_bytes_available(rb);
         if (available < len) {
             if (!rb->allow_overwrite)
-                return -1;
+                return LOCKFREE_RINGBUF_ERROR_WRITTEN_SIZE_EXCEED_BUFFER_AVAILABLE;
             lockfree_ringbuf_unsafe_discard(rb, len-available);
         }
         if ((rb->p_w + len) > (rb->p_o + rb->size)) {
@@ -158,7 +165,7 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
         rb->fill_cnt += len;
     } else {
         if (!rb->allow_overwrite)
-            return -1;
+            return LOCKFREE_RINGBUF_ERROR_WRITTEN_SIZE_EXCEED_BUFFER_SIZE;
         buf = buf + len - rb->size;
         len = rb->size;
         memcpy(rb->p_o, buf, len);

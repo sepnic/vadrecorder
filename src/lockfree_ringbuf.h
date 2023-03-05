@@ -21,6 +21,13 @@
 extern "C" {
 #endif
 
+enum {
+    LOCKFREE_RINGBUF_NO_ERROR = 0,
+    LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER = -1,
+    LOCKFREE_RINGBUF_ERROR_WRITTEN_SIZE_EXCEED_BUFFER_AVAILABLE = -2,
+    LOCKFREE_RINGBUF_ERROR_WRITTEN_SIZE_EXCEED_BUFFER_SIZE = -3,
+};
+
 void *lockfree_ringbuf_create(int size);
 
 void lockfree_ringbuf_destroy(void *handle);
