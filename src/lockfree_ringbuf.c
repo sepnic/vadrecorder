@@ -147,13 +147,12 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
     struct lockfree_ringbuf *rb = (struct lockfree_ringbuf *)handle;
     if (rb == NULL || buf == NULL || len <= 0)
         return LOCKFREE_RINGBUF_ERROR_INVALID_PARAMETER;
-    if (len < rb->buffer_size) {
-        int available = rb->buffer_size - atomic_load(&rb->filled_size);
-        if (len > available) {
-            if (!rb->allow_overwrite)
-                return LOCKFREE_RINGBUF_ERROR_WRITE_SIZE_EXCEED_BUFFER_AVAILABLE;
+    int available = rb->buffer_size - atomic_load(&rb->filled_size);
+    if (len > available && !rb->allow_overwrite)
+        return LOCKFREE_RINGBUF_ERROR_INSUFFICIENT_WRITEABLE_BUFFER;
+    if (len <= rb->buffer_size) {
+        if (len > available)
             lockfree_ringbuf_unsafe_discard(rb, len-available);
-        }
         if ((rb->p_w + len) > (rb->p_o + rb->buffer_size)) {
             int wlen1 = rb->p_o + rb->buffer_size - rb->p_w;
             int wlen2 = len - wlen1;
@@ -166,8 +165,6 @@ int lockfree_ringbuf_write(void *handle, char *buf, int len)
         }
         atomic_fetch_add(&rb->filled_size, len);
     } else {
-        if (!rb->allow_overwrite)
-            return LOCKFREE_RINGBUF_ERROR_WRITE_SIZE_EXCEED_BUFFER_SIZE;
         buf = buf + len - rb->buffer_size;
         len = rb->buffer_size;
         memcpy(rb->p_o, buf, len);
