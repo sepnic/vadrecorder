@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.4.1)
+project(vadrecorder_jni)
 
 # cflags
 set(CMAKE_C_FLAGS   "-Wall -Werror -std=gnu11")

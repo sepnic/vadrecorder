@@ -108,7 +108,7 @@ static bool valid_frame_size(int rate_idx, int frame_size)
     return false;
 }
 
-litevad_handle_t litevad_create(int sample_rate, int channel_count)
+litevad_handle_t litevad_create(int sample_rate, int channel_count, int sample_bits)
 {
     if (!valid_vad_mode(DEFAULT_VAD_MODE)) {
         pr_err("Invalid vad mode, valid value: 0/1/2/3");
@@ -124,6 +124,11 @@ litevad_handle_t litevad_create(int sample_rate, int channel_count)
     if (channel_count != 1) {
         // todo: support stereo2mono
         pr_err("Invalid channel count, valid value: 1");
+        return NULL;
+    }
+
+    if (sample_bits != 16) {
+        pr_err("Invalid sample bits, valid value: 16");
         return NULL;
     }
 

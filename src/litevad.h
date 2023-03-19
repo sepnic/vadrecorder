@@ -31,7 +31,7 @@ typedef enum {
 
 typedef void *litevad_handle_t;
 
-litevad_handle_t litevad_create(int sample_rate, int channel_count);
+litevad_handle_t litevad_create(int sample_rate, int channel_count, int sample_bits);
 
 litevad_result_t litevad_process(litevad_handle_t handle, const void *buff, int size);
 

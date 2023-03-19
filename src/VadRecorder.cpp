@@ -93,7 +93,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
         return false;
     }
 
-    mVadHandle = litevad_create(sampleRate, channels);
+    mVadHandle = litevad_create(sampleRate, channels, bitsPerSample);
     if (mVadHandle == NULL) {
         pr_err("Failed to litevad_create");
         return false;

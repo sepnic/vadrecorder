@@ -16,10 +16,10 @@
 
 #include <jni.h>
 #include <cstdio>
-#include <unistd.h>
 #include <cstring>
 #include <ctime>
 #include <cassert>
+#include <unistd.h>
 #include "VadRecorder.hpp"
 #include "logger.h"
 
@@ -108,8 +108,8 @@ static void jniThrowException(JNIEnv *env, const char *className, const char *ms
 static jlong VadRecorder_Create(JNIEnv* env, jobject thiz)
 {
     pr_dbg("VadRecorderCreate");
-    auto *recorderWrapper = new VadRecorderWrapperJni();
-    return (jlong)recorderWrapper;
+    auto *wrapper = new VadRecorderWrapperJni();
+    return (jlong)wrapper;
 }
 
 static jboolean VadRecorder_Init(JNIEnv *env, jobject thiz, jlong handle,
@@ -117,8 +117,8 @@ static jboolean VadRecorder_Init(JNIEnv *env, jobject thiz, jlong handle,
                                 jint sampleRate, jint channels, jint bitsPerSample, jint marginMs)
 {
     pr_dbg("VadRecorderInit: %dHz/%dCh/%dBits", sampleRate, channels, bitsPerSample);
-    auto recorderWrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
-    if (recorderWrapper == nullptr) {
+    auto wrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
+    if (wrapper == nullptr) {
         jniThrowException(env, "java/lang/IllegalStateException", nullptr);
         return JNI_FALSE;
     }
@@ -126,21 +126,20 @@ static jboolean VadRecorder_Init(JNIEnv *env, jobject thiz, jlong handle,
     jboolean ret = JNI_FALSE;
     const char *voiceFileUtf = env->GetStringUTFChars(voiceFilePath,nullptr);
     const char *timestampFileUtf = env->GetStringUTFChars(timestampFilePath,nullptr);
-    recorderWrapper->mRecordVoiceFile = fopen(voiceFileUtf, "wb");
-    if (recorderWrapper->mRecordVoiceFile == nullptr) {
+    wrapper->mRecordVoiceFile = fopen(voiceFileUtf, "wb");
+    if (wrapper->mRecordVoiceFile == nullptr) {
         pr_err("Failed to open record file: %s", voiceFileUtf);
         goto __error_init;
     }
-    recorderWrapper->mRecordTimestampFile = fopen(timestampFileUtf, "w");
-    if (recorderWrapper->mRecordTimestampFile == nullptr) {
+    wrapper->mRecordTimestampFile = fopen(timestampFileUtf, "w");
+    if (wrapper->mRecordTimestampFile == nullptr) {
         pr_err("Failed to open timestamp file: %s", timestampFileUtf);
     }
-    recorderWrapper->mVadRecorderListener->setVoiceFile(recorderWrapper->mRecordVoiceFile);
-    recorderWrapper->mVadRecorderListener->setTimestampFile(recorderWrapper->mRecordTimestampFile);
+    wrapper->mVadRecorderListener->setVoiceFile(wrapper->mRecordVoiceFile);
+    wrapper->mVadRecorderListener->setTimestampFile(wrapper->mRecordTimestampFile);
 
-    recorderWrapper->mVadRecorder->setSpeechMarginMs(marginMs);
-    ret = recorderWrapper->mVadRecorder->init(recorderWrapper->mVadRecorderListener,
-                                              sampleRate, channels, bitsPerSample);
+    wrapper->mVadRecorder->setSpeechMarginMs(marginMs);
+    ret = wrapper->mVadRecorder->init(wrapper->mVadRecorderListener, sampleRate, channels, bitsPerSample);
     if (!ret)
         pr_err("Failed to Init VadRecorder");
 
@@ -153,13 +152,13 @@ __error_init:
 static jboolean VadRecorder_Feed(JNIEnv *env, jobject thiz, jlong handle, jbyteArray buff, jint size)
 {
     //pr_dbg("VadRecorderFeed");
-    auto recorderWrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
-    if (recorderWrapper == nullptr) {
+    auto wrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
+    if (wrapper == nullptr) {
         jniThrowException(env, "java/lang/IllegalStateException", nullptr);
         return JNI_FALSE;
     }
     jbyte *pcmBuffer = env->GetByteArrayElements(buff, nullptr);
-    jboolean ret = recorderWrapper->mVadRecorder->feed((char *)pcmBuffer, size);
+    jboolean ret = wrapper->mVadRecorder->feed((char *)pcmBuffer, size);
     if (!ret)
         pr_err("Failed to feed pcm data to VadRecorder");
     env->ReleaseByteArrayElements(buff, pcmBuffer, 0);
@@ -169,31 +168,31 @@ static jboolean VadRecorder_Feed(JNIEnv *env, jobject thiz, jlong handle, jbyteA
 static void VadRecorder_Deinit(JNIEnv *env, jobject thiz, jlong handle)
 {
     pr_dbg("VadRecorderDeinit");
-    auto recorderWrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
-    if (recorderWrapper == nullptr) {
+    auto wrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
+    if (wrapper == nullptr) {
         jniThrowException(env, "java/lang/IllegalStateException", nullptr);
         return;
     }
-    recorderWrapper->mVadRecorder->deinit();
-    if (recorderWrapper->mRecordVoiceFile != nullptr) {
-        fclose(recorderWrapper->mRecordVoiceFile);
-        recorderWrapper->mRecordVoiceFile = nullptr;
+    wrapper->mVadRecorder->deinit();
+    if (wrapper->mRecordVoiceFile != nullptr) {
+        fclose(wrapper->mRecordVoiceFile);
+        wrapper->mRecordVoiceFile = nullptr;
     }
-    if (recorderWrapper->mRecordTimestampFile != nullptr) {
-        fclose(recorderWrapper->mRecordTimestampFile);
-        recorderWrapper->mRecordTimestampFile = nullptr;
+    if (wrapper->mRecordTimestampFile != nullptr) {
+        fclose(wrapper->mRecordTimestampFile);
+        wrapper->mRecordTimestampFile = nullptr;
     }
 }
 
 static void VadRecorder_Destroy(JNIEnv *env, jobject thiz, jlong handle)
 {
     pr_dbg("VadRecorderDestroy");
-    auto recorderWrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
-    if (recorderWrapper == nullptr) {
+    auto wrapper = reinterpret_cast<VadRecorderWrapperJni *>(handle);
+    if (wrapper == nullptr) {
         jniThrowException(env, "java/lang/IllegalStateException", nullptr);
         return;
     }
-    delete recorderWrapper;
+    delete wrapper;
 }
 
 static JNINativeMethod gMethods[] = {
