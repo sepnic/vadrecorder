@@ -90,6 +90,7 @@ bool VadRecorder::init(VadRecorderListener *listener,
     int frameCountPer10Ms = sampleRate/100;
     int frameBytesPer10Ms = frameCountPer10Ms*channels*bitsPerSample/8;
 
+    mInputBufferRemain = 0;
     mInputBufferSize = frameBytesPer10Ms*3;
     mInputBuffer = new char[mInputBufferSize];
 
@@ -209,19 +210,22 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
                 memcpy(&mInputBuffer[mInputBufferRemain], inBuffer, filledSize);
                 inBuffer += filledSize;
                 inLength -= filledSize;
+                mInputBufferRemain = 0;
                 if (!process(mInputBuffer, frameBytesPer10Ms))
                     return false;
-                mInputBufferRemain = 0;
             }
         } else {
             pr_err("Input buffer size is too small, it should not happen");
+            mInputBufferRemain = 0;
             return false;
         }
     }
 
     while (inLength >= frameBytesPer10Ms) {
-        if (!process(inBuffer, frameBytesPer10Ms))
+        if (!process(inBuffer, frameBytesPer10Ms)) {
+            mInputBufferRemain = 0;
             return false;
+        }
         inBuffer += frameBytesPer10Ms;
         inLength -= frameBytesPer10Ms;
     }
@@ -231,6 +235,7 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
         mInputBufferRemain += inLength;
     } else {
         pr_err("Input buffer size is too small, it should not happen");
+        mInputBufferRemain = 0;
         return false;
     }
 
