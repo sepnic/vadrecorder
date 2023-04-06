@@ -151,9 +151,7 @@ public class MainActivity extends Activity {
         int sampleRate = RECORD_SAMPLE_RATE;
         int channelConfig = AudioFormat.CHANNEL_IN_MONO;
         int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-        int bytesPer10Ms = sampleRate/100*2;
         mBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat);
-        mBufferSize = (mBufferSize/bytesPer10Ms + 1)*bytesPer10Ms;
         mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, mBufferSize);
         native_init(mVadRecorderHandle, mRecordVoiceFile, mRecordTimestampFile,
                 sampleRate, 1, 16, RECORD_MARGIN_MS);

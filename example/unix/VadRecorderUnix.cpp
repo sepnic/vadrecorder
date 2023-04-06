@@ -26,6 +26,7 @@
 #define SAMPLE_RATE      16000
 #define CHANNEL_COUNT    1
 #define SAMPLE_BITS      16
+#define RECORD_SIZE      2048
 #define SPEECH_MARGIN    (5*1000) // in ms
 
 class VadRecorderListenerUnix : public VadRecorderListener
@@ -113,9 +114,7 @@ int main(int argc, char *argv[])
             pr_err("Failed to Pa_Initialize");
             goto __out;
         }
-        int perferredFrameSize = VadRecorder::getPerferredInputBufferSize(
-                SAMPLE_RATE, CHANNEL_COUNT, SAMPLE_BITS);
-        unsigned long framesNeed = perferredFrameSize/(CHANNEL_COUNT*SAMPLE_BITS/8);
+        unsigned long framesNeed = RECORD_SIZE/(CHANNEL_COUNT*SAMPLE_BITS/8);
         PaStream *inStream = NULL;
         PaStreamParameters inParameters;
         inParameters.device = Pa_GetDefaultInputDevice();

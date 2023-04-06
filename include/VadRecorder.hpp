@@ -79,14 +79,6 @@ public:
         mSpeechMarginMsMax = marginMs > 1000 ? marginMs : 1000;
     }
 
-    static int getPerferredInputBufferSize(int sampleRate, int channels, int bitsPerSample) {
-        int frameMs = 30; // valid value for vad engine: { 10ms, 20ms, 30ms }
-        int frameSize = sampleRate/1000*frameMs;
-        int bufferSize = frameSize*channels*bitsPerSample/8;
-        int multiple = 2;
-        return bufferSize * multiple;
-    }
-
     bool init(VadRecorderListener *listener,
               int sampleRate, int channels, int bitsPerSample,
               EncoderType encoderType = ENCODER_AAC);
@@ -105,12 +97,18 @@ private:
     IAudioEncoder *mEncoderHandle;
     IAudioEncoderListener *mEncoderListener;
     void *mVadHandle;
-    bool mSpeechDetected;
-    int mSpeechMarginMsMax;
-    int mSpeechMarginMsVal;
+    bool  mSpeechDetected;
+    int   mSpeechMarginMsMax;
+    int   mSpeechMarginMsVal;
+    char *mInputBuffer;
+    int   mInputBufferSize;
+    int   mInputBufferRemain;
     void *mCacheRingbuf;
-    char *mTempBuffer;
-    int mTempBufferLength;
+    char *mCacheBuffer;
+    int   mCacheBufferSize;
+
+private:
+    bool process(char *inBuffer, int inLength);
 };
 
 #endif // __VADRECORDER_H

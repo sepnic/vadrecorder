@@ -48,9 +48,11 @@ VadRecorder::VadRecorder()
       mSpeechDetected(false),
       mSpeechMarginMsMax(0),
       mSpeechMarginMsVal(0),
+      mInputBuffer(NULL),
+      mInputBufferRemain(0),
       mCacheRingbuf(NULL),
-      mTempBuffer(NULL),
-      mTempBufferLength(0)
+      mCacheBuffer(NULL),
+      mCacheBufferSize(0)
 {}
 
 VadRecorder::~VadRecorder()
@@ -61,8 +63,10 @@ VadRecorder::~VadRecorder()
         delete mEncoderHandle;
     if (mEncoderListener != NULL)
         delete mEncoderListener;
-    if (mTempBuffer != NULL)
-        delete [] mTempBuffer;
+    if (mInputBuffer != NULL)
+        delete [] mInputBuffer;
+    if (mCacheBuffer != NULL)
+        delete [] mCacheBuffer;
     if (mCacheRingbuf != NULL)
         lockfree_ringbuf_destroy(mCacheRingbuf);
 }
@@ -85,10 +89,14 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
     int frameCountPer10Ms = sampleRate/100;
     int frameBytesPer10Ms = frameCountPer10Ms*channels*bitsPerSample/8;
-    mTempBufferLength = frameBytesPer10Ms*10; // temp buffer for 100ms data
-    mTempBuffer = new char[mTempBufferLength];
+
+    mInputBufferSize = frameBytesPer10Ms*3;
+    mInputBuffer = new char[mInputBufferSize];
+
+    mCacheBufferSize = frameBytesPer10Ms*10; // cache buffer for 100ms data
+    mCacheBuffer = new char[mCacheBufferSize];
     mCacheRingbuf = lockfree_ringbuf_create(frameBytesPer10Ms*kCacheTimeInMs/10);
-    if (mTempBuffer == NULL || mCacheRingbuf == NULL) {
+    if (mCacheRingbuf == NULL) {
         pr_err("Failed to allocate cache buffer");
         return false;
     }
@@ -126,19 +134,8 @@ bool VadRecorder::init(VadRecorderListener *listener,
     return mInited;
 }
 
-bool VadRecorder::feed(char *inBuffer, int inLength)
+bool VadRecorder::process(char *inBuffer, int inLength)
 {
-    pr_dbg("Feed input buffer:%p, size:%d", inBuffer, inLength);
-    if (!mInited) {
-        pr_err("VadRecorder not inited");
-        return false;
-    }
-
-    if (inBuffer == NULL || inLength <= 0) {
-        pr_err("Invalid input buffer or input length");
-        return false;
-    }
-
     litevad_result_t vadResult = litevad_process(mVadHandle, inBuffer, inLength);
     switch (vadResult) {
     case LITEVAD_RESULT_SPEECH_BEGIN:
@@ -154,7 +151,7 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
         break;
     case LITEVAD_RESULT_ERROR:
         pr_err("Invalid litevad result");
-        break;
+        return false;
     default:
         break;
     }
@@ -173,19 +170,71 @@ bool VadRecorder::feed(char *inBuffer, int inLength)
         int cacheSize = lockfree_ringbuf_bytes_filled(mCacheRingbuf);
         pr_dbg("Encode cache buffer: size:%d", cacheSize);
         while (cacheSize > 0) {
-            int readSize = lockfree_ringbuf_read(mCacheRingbuf, mTempBuffer, mTempBufferLength);
+            int readSize = lockfree_ringbuf_read(mCacheRingbuf, mCacheBuffer, mCacheBufferSize);
             if (readSize > 0) {
-                mEncoderHandle->encode(mTempBuffer, readSize);
+                mEncoderHandle->encode(mCacheBuffer, readSize);
                 cacheSize -= readSize;
             } else {
                 break;
             }
         }
+        pr_dbg("Encode intput buffer: size:%d", inLength);
         return mEncoderHandle->encode(inBuffer, inLength) == IAudioEncoder::ENCODER_NOERROR;
     } else {
         lockfree_ringbuf_unsafe_overwrite(mCacheRingbuf, inBuffer, inLength);
         return true;
     }
+}
+
+bool VadRecorder::feed(char *inBuffer, int inLength)
+{
+    pr_dbg("Feed input buffer:%p, size:%d", inBuffer, inLength);
+    if (!mInited) {
+        pr_err("VadRecorder not inited");
+        return false;
+    }
+
+    if (inBuffer == NULL || inLength <= 0) {
+        pr_err("Invalid input buffer or input length");
+        return false;
+    }
+
+    int frameCountPer10Ms = mSampleRate/100;
+    int frameBytesPer10Ms = frameCountPer10Ms*mChannels*mBitsPerSample/8;
+
+    if (mInputBufferRemain > 0) {
+        if (mInputBufferSize >= frameBytesPer10Ms && frameBytesPer10Ms > mInputBufferRemain) {
+            int filledSize = frameBytesPer10Ms-mInputBufferRemain;
+            if (filledSize <= inLength) {
+                memcpy(&mInputBuffer[mInputBufferRemain], inBuffer, filledSize);
+                inBuffer += filledSize;
+                inLength -= filledSize;
+                if (!process(mInputBuffer, frameBytesPer10Ms))
+                    return false;
+                mInputBufferRemain = 0;
+            }
+        } else {
+            pr_err("Input buffer size is too small, it should not happen");
+            return false;
+        }
+    }
+
+    while (inLength >= frameBytesPer10Ms) {
+        if (!process(inBuffer, frameBytesPer10Ms))
+            return false;
+        inBuffer += frameBytesPer10Ms;
+        inLength -= frameBytesPer10Ms;
+    }
+
+    if (inLength+mInputBufferRemain <= mInputBufferSize) {
+        memcpy(&mInputBuffer[mInputBufferRemain], inBuffer, inLength);
+        mInputBufferRemain += inLength;
+    } else {
+        pr_err("Input buffer size is too small, it should not happen");
+        return false;
+    }
+
+    return true;;
 }
 
 void VadRecorder::deinit()
@@ -199,8 +248,10 @@ void VadRecorder::deinit()
         mEncoderHandle = NULL;
         delete mEncoderListener;
         mEncoderListener = NULL;
-        delete [] mTempBuffer;
-        mTempBuffer = NULL;
+        delete [] mInputBuffer;
+        mInputBuffer = NULL;
+        delete [] mCacheBuffer;
+        mCacheBuffer = NULL;
         lockfree_ringbuf_destroy(mCacheRingbuf);
         mCacheRingbuf = NULL;
         mInited = false;
