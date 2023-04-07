@@ -45,6 +45,7 @@ VadRecorder::VadRecorder()
       mEncoderHandle(NULL),
       mEncoderListener(NULL),
       mVadHandle(NULL),
+      mVadMonoBuffer(NULL),
       mSpeechDetected(false),
       mSpeechMarginMsMax(0),
       mSpeechMarginMsVal(0),
@@ -59,6 +60,8 @@ VadRecorder::~VadRecorder()
 {
     if (mVadHandle != NULL)
         litevad_destroy(mVadHandle);
+    if (mVadMonoBuffer != NULL)
+        delete [] mVadMonoBuffer;
     if (mEncoderHandle != NULL)
         delete mEncoderHandle;
     if (mEncoderListener != NULL)
@@ -102,11 +105,13 @@ bool VadRecorder::init(VadRecorderListener *listener,
         return false;
     }
 
-    mVadHandle = litevad_create(sampleRate, channels, bitsPerSample);
+    mVadHandle = litevad_create(sampleRate, 1, bitsPerSample);
     if (mVadHandle == NULL) {
         pr_err("Failed to litevad_create");
         return false;
     }
+    if (channels == 2)
+        mVadMonoBuffer = new char[(frameCountPer10Ms*sizeof(short))*3];
 
     switch (encoderType) {
     case ENCODER_AAC:
@@ -137,7 +142,20 @@ bool VadRecorder::init(VadRecorderListener *listener,
 
 bool VadRecorder::process(char *inBuffer, int inLength)
 {
-    litevad_result_t vadResult = litevad_process(mVadHandle, inBuffer, inLength);
+    char *vadBuffer = inBuffer;
+    int vadLength = inLength;
+
+    if (mChannels == 2 && mVadMonoBuffer != NULL) {
+        int nFrames = inLength / (mChannels*sizeof(short));
+        short *monoBuffer = (short *)mVadMonoBuffer;
+        short *stereoBuffer = (short *)inBuffer;
+        for (int i = 0; i < nFrames; i++)
+           monoBuffer[i] = stereoBuffer[i*2];
+        vadBuffer = mVadMonoBuffer;
+        vadLength = nFrames*sizeof(short);
+    }
+
+    litevad_result_t vadResult = litevad_process(mVadHandle, vadBuffer, vadLength);
     switch (vadResult) {
     case LITEVAD_RESULT_SPEECH_BEGIN:
         mSpeechDetected = true;
@@ -248,6 +266,8 @@ void VadRecorder::deinit()
     if (mInited) {
         litevad_destroy(mVadHandle);
         mVadHandle = NULL;
+        delete [] mVadMonoBuffer;
+        mVadMonoBuffer = NULL;
         mEncoderHandle->deinit();
         delete mEncoderHandle;
         mEncoderHandle = NULL;

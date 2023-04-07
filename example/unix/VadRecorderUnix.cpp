@@ -24,10 +24,10 @@
 #define TAG "VadRecorderUnix"
 
 #define SAMPLE_RATE      16000
-#define CHANNEL_COUNT    1
+#define CHANNEL_COUNT    2
 #define SAMPLE_BITS      16
 #define RECORD_SIZE      2048
-#define SPEECH_MARGIN    (5*1000) // in ms
+#define SPEECH_MARGIN    (2*1000) // in ms
 
 class VadRecorderListenerUnix : public VadRecorderListener
 {

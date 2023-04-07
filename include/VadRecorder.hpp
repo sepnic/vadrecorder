@@ -97,6 +97,7 @@ private:
     IAudioEncoder *mEncoderHandle;
     IAudioEncoderListener *mEncoderListener;
     void *mVadHandle;
+    char *mVadMonoBuffer;
     bool  mSpeechDetected;
     int   mSpeechMarginMsMax;
     int   mSpeechMarginMsVal;
