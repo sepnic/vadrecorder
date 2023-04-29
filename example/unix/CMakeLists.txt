@@ -13,8 +13,6 @@ set(VADREC_DIR      "${TOP_DIR}/src")
 
 # include files
 include_directories(${TOP_DIR}/include)
-include_directories(${VOAAC_DIR}/include)
-include_directories(${WEBRTC_DIR}/inc)
 
 # VOAAC_SRC source files
 set (VOAAC_SRC
@@ -74,52 +72,25 @@ set(VADREC_SRC
 
 # libvadrecorder
 add_library(vadrecorder STATIC ${VADREC_SRC} ${VOAAC_SRC} ${WEBRTC_SRC})
+target_include_directories(vadrecorder PRIVATE ${VOAAC_DIR}/include ${WEBRTC_DIR}/inc)
 
 ###############################################################################
 ## portaudio
-set(PORTAUDIO_DIR   "${TOP_DIR}/thirdparty/portaudio")
-include_directories(${PORTAUDIO_DIR}/include)
-include_directories(${PORTAUDIO_DIR}/src/common)
-include_directories(${PORTAUDIO_DIR}/src/os/unix)
-set(PORTAUDIO_SRC
-    ${PORTAUDIO_DIR}/src/common/pa_allocation.c
-    ${PORTAUDIO_DIR}/src/common/pa_converters.c
-    ${PORTAUDIO_DIR}/src/common/pa_cpuload.c
-    ${PORTAUDIO_DIR}/src/common/pa_debugprint.c
-    ${PORTAUDIO_DIR}/src/common/pa_dither.c
-    ${PORTAUDIO_DIR}/src/common/pa_front.c
-    ${PORTAUDIO_DIR}/src/common/pa_process.c
-    ${PORTAUDIO_DIR}/src/common/pa_ringbuffer.c
-    ${PORTAUDIO_DIR}/src/common/pa_stream.c
-    ${PORTAUDIO_DIR}/src/common/pa_trace.c
-    ${PORTAUDIO_DIR}/src/hostapi/skeleton/pa_hostapi_skeleton.c
-    ${PORTAUDIO_DIR}/src/os/unix/pa_unix_hostapis.c
-    ${PORTAUDIO_DIR}/src/os/unix/pa_unix_util.c)
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_USE_ALSA=1")
-    set(PORTAUDIO_SRC ${PORTAUDIO_SRC} ${PORTAUDIO_DIR}/src/hostapi/alsa/pa_linux_alsa.c)
-    set(PLATFORM_LIB "asound")
-elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_USE_COREAUDIO=1")
+execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_portaudio.sh
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/include)
+link_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/lib)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework Accelerate")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreAudio")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework AudioToolbox")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework AudioUnit")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreServices")
-    set(PORTAUDIO_SRC ${PORTAUDIO_SRC}
-        ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core.c
-        ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core_blocking.c
-        ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core_utilities.c)
 endif()
-include(TestBigEndian)
-TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
-if(IS_BIG_ENDIAN)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_BIG_ENDIAN")
-else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_LITTLE_ENDIAN")
-endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations")
 ## example
-add_executable(VadRecorderUnix ${CMAKE_SOURCE_DIR}/VadRecorderUnix.cpp ${PORTAUDIO_SRC})
-target_link_libraries(VadRecorderUnix vadrecorder pthread ${PLATFORM_LIB})
+add_executable(VadRecorderUnix ${CMAKE_SOURCE_DIR}/VadRecorderUnix.cpp)
+target_link_libraries(VadRecorderUnix vadrecorder portaudio pthread)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    target_link_libraries(VadRecorderUnix asound)
+endif()
 ###############################################################################
