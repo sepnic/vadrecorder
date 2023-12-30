@@ -18,7 +18,6 @@ package com.example.vadrecorder_demo;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -131,8 +130,6 @@ public class MainActivity extends Activity {
             mStarted = true;
             startRecording();
             mStatusView.setText("Recording");
-            // start SilenceMusicService in order to keep recorder alive
-            startService(new Intent(getApplicationContext(), SilenceMusicService.class));
         }
     }
 
@@ -141,8 +138,6 @@ public class MainActivity extends Activity {
             stopRecording();
             mStarted = false;
             mStatusView.setText("Idle");
-            // stop SilenceMusicService when recorder stopped
-            stopService(new Intent(getApplicationContext(), SilenceMusicService.class));
         }
     }
 
